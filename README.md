@@ -1,5 +1,7 @@
 # 🚀 Project Bootstrap
 
+[English](./README_EN.md) | 简体中文
+
 > **一份引擎，一份燃料，十平台通用。** 将 AI Agent 协作规范一键部署到任意项目，让所有主流 AI 编程助手自动遵守统一的行为纪律。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
