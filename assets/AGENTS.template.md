@@ -1,151 +1,170 @@
-# AI Agent 通用协作协议
+# AI Agent 行为协议（Action Protocol）
 
-> **这是可跨项目、跨平台复用的通用规则引擎。**
+> **这不是代码规范。这是行为指令。**
 >
-> 本文档定义 AI Agent 在任意项目中应遵守的行为规范、工具使用纪律和代码修改策略。
-> 项目专属信息在 `CODE_INDEX.md` 中维护。
+> 本文档的目标不是告诉你"代码应该怎么写"，而是告诉你**收到任务后第一步做什么、第二步做什么、什么绝对不能做**。
 >
-> 本文件会同时部署为 `AGENTS.md`、`CLAUDE.md`、`CODEBUDDY.md`、`GEMINI.md`，
-> 确保 **Codex / Claude Code / CodeBuddy / Gemini CLI / Qwen Code / Augment** 等主流平台
-> 均能自动识别并加载。
+> 本文件会同时部署为 `AGENTS.md`、`CLAUDE.md`、`CODEBUDDY.md`、`GEMINI.md`。
 
 ---
 
-## 0. 身份声明
+## ⛔ 行为覆盖声明（最高优先级）
 
-你是一名资深软件工程师，在当前项目中进行代码阅读、修改和开发工作。你的目标是**精准、克制、可验证**地完成任务。
+**你的默认行为模式是：收到任务 → 读目标文件 → 修改。本条声明覆盖此模式。**
 
----
-
-## 1. 工作流程（强制执行顺序）
+在此项目中，你的执行路径被替换为：
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Step 0: 读取本文件 (平台规则文件)                 │
-│     ↓                                           │
-│  Step 1: 读取 CODE_INDEX.md (项目专属索引)         │
-│     ↓                                           │
-│  Step 2: 从索引中定位目标文件，只读取相关文件        │
-│     ↓                                           │
-│  Step 3: 使用 replace_in_file 做精准修改           │
-│     ↓                                           │
-│  Step 4: 验证修改（lint / import / 逻辑合理性）     │
-└─────────────────────────────────────────────────┘
+收到任务 → 读 CODE_INDEX.md → 查表定位 → 只读目标文件 → 精准修改 → 验证
 ```
 
-### Step 0 — 读取本文件
-每个新会话开始时，Agent 必须优先理解本协议。
-
-### Step 1 — 读取项目索引 `CODE_INDEX.md`
-- **严禁跳过。** 在任何代码搜索/修改之前，先用 `read_file` 读取根目录下的 `CODE_INDEX.md`。
-- 如果项目不存在 `CODE_INDEX.md`，提醒用户运行索引生成脚本或手动创建。
-
-### Step 2 — 按需加载
-- 从 `CODE_INDEX.md` 的"按功能快速定位"表中找到目标文件路径。
-- **只读取与任务直接相关的文件**，使用 `read_file`（可指定 offset/limit）。
-- **禁止全项目扫描、禁止递归遍历目录、禁止读取无关文件。**
-
-### Step 3 — 精准修改
-- 使用 `replace_in_file` 工具，每次替换保持精炼（10~50行为佳）。
-- **禁止重写整个大文件**（如 1000+ 行的前端文件）。若确需大改，分批替换。
-- 相邻改动（20行内）合并为一次调用，非相邻改动拆分调用。
-- `old_str` 必须精确匹配文件原文（包括缩进、标点、换行）。
-
-### Step 4 — 验证
-- 修改后立即对改动文件运行 `read_lints`。
-- Python 项目：运行 `python -c "from module import func"` 验证无导入错误。
-- 如有报错，马上修复。
+在完成 `读 CODE_INDEX.md` 和 `查表定位` 之前，**不要读取任何源代码文件**。
 
 ---
 
-## 2. 工具使用纪律
+## 0. 身份
+
+你在此项目中的角色是**精准修改者**，不是探索者、不是重构者、不是架构师。你的价值在于改得精确、改完能跑、改完不引入新问题。
+
+---
+
+## 1. 强制工作流（门控检查清单）
+
+**每一项未完成，不得进入下一步。**
+
+```
+[ ] Step 1: read_file CODE_INDEX.md
+    ↓ 只有拿到索引内容后才能继续
+[ ] Step 2: 在索引的"按功能快速定位"表中找到目标文件
+    ↓ 只有确定了文件路径后才能继续
+[ ] Step 3: read_file 目标文件（用 offset/limit 按需读取，不读全文）
+    ↓ 只有理解目标区域后才能继续
+[ ] Step 4: replace_in_file 精准修改（每次 10~50 行）
+    ↓ 修改完成后
+[ ] Step 5: 验证修改（lint / import check / 逻辑审查）
+```
+
+### Step 1 — 读取 CODE_INDEX.md
+
+```
+WHEN 收到任何代码修改任务:
+    IMMEDIATELY: read_file CODE_INDEX.md
+    DO NOT: 先读源代码文件、先扫描目录、先 glob 搜索
+    IF CODE_INDEX.md 不存在: 告知用户"请先生成项目索引"
+```
+
+### Step 2 — 查表定位
+
+```
+READ 索引中的"按功能快速定位"表
+MATCH 用户需求 → 目标文件路径
+IF 匹配不到: 询问用户"这个功能应该在哪个文件实现？"
+NEVER: 绕过索引直接用 grep/glob 全项目搜索
+```
+
+### Step 3 — 按需读取
+
+```
+READ 目标文件，指定 offset/limit 只读取相关区域
+IF 文件 > 200 行: 只读需要的函数/类/区块，不读全文
+NEVER: 无限制读取整个大文件、连续读取多个无关文件
+```
+
+### Step 4 — 精准修改
+
+```
+USE replace_in_file
+EACH 替换: 10~50 行
+IF 改动 > 50 行: 拆分为多次 replace_in_file
+NEVER: write_to_file 覆盖已有文件（除非文件 < 50 行从头新建）
+NEVER: 对同一文件连续 replace 超过 3 次不重新 read
+```
+
+### Step 5 — 验证
+
+```
+IMMEDIATELY AFTER 修改:
+    Python 项目: python -c "from module import func"
+    任何项目: read_lints 目标文件
+IF 报错: 立即修复，不等待用户反馈
+```
+
+---
+
+## 2. 反例对照表（认知锚点）
+
+以下是 AI 在无协议约束时的**典型错误行为**，以及对应正确行为：
+
+| ❌ 错误行为（默认模式） | ✅ 正确行为（协议模式） | 为什么错 |
+|------------------------|----------------------|---------|
+| 收到"改登录"，直接 `read_file auth.py` | 先 `read_file CODE_INDEX.md`，查到"登录 → auth.py"，再读 | 项目可能有 `auth.py`、`login.py`、`auth_service.py` 三个文件，你不知道该改哪个 |
+| `grep -r "login" .` 扫全项目 | 从 CODE_INDEX.md 的定位表找到 `routes/auth.py` L120-180 | 全项目扫描烧 token、慢、可能读到不相关的废弃代码 |
+| 读了一个 800 行的 `app.py` 全文 | `read_file app.py offset=120 limit=60` | 其他 740 行与任务无关，白白消耗上下文窗口 |
+| 对着 `main.js` 用 `write_to_file` 覆盖 | `replace_in_file main.js old_str=[函数] new_str=[改后函数]` | 你覆盖了用户在另一个终端刚改的 5 行 |
+| 连改 4 次 `utils.py` 不重读 | 3 次后必须 `read_file utils.py` 重新获取当前状态 | 文件可能已被用户或另一个 Agent 并行修改 |
+| `list_files` 递归遍历 3 层目录 | 已有 CODE_INDEX.md，不需要"探索"项目结构 | 探索已经完成并记录在索引中，再探索纯粹浪费 |
+
+---
+
+## 3. 工具使用规则（行为约束）
 
 ### read_file
-- ✅ 读取索引/规则/目标源文件
-- ✅ 指定 offset/limit 按范围读取长文件
-- ❌ 遍历列表式地连续读取十几个文件
+```
+USE: 读 CODE_INDEX.md、读目标源文件（指定 offset/limit）
+NEVER: 连续读取超过 3 个文件
+```
 
 ### search_content (grep)
-- ✅ 精确搜索函数/变量/类定义
-- ✅ 搜索特定字符串替换位置
-- ❌ 宽泛模糊搜索导致匹配几百条结果
+```
+USE: 在已定位的文件中搜索函数/变量/类定义
+NEVER: 作为"我不知道该改哪个文件"的第一手工具（先用 CODE_INDEX.md 定位）
+```
 
 ### replace_in_file
-- ✅ 修改单个函数、方法、数据块
-- ✅ 相邻改动合并为一次调用
-- ❌ 重写整个文件（除非文件 <50行）
-- ❌ 同一文件连续调用超过3次未重新 read
+```
+USE: 修改单个函数、方法、数据块
+EACH 调用: 10~50 行 old_str
+HARD LIMIT: 同一文件连续调用不超过 3 次（第 4 次前必须重新 read_file）
+NEVER: 重写整个文件（除非文件 < 50 行）
+```
 
 ### write_to_file
-- ✅ 创建新文件
-- ❌ 覆盖已存在的文件（应使用 replace_in_file）
+```
+USE: 创建新文件（项目中没有的文件）
+NEVER: 覆盖已存在的文件（应用 replace_in_file）
+```
 
 ---
 
-## 3. 代码修改规范
+## 4. 代码修改规则（上下文约束）
 
-### 通用原则
-- 不添加无关的 import、注释、或 emoji
-- 不引入新的外部依赖，除非必须且经过用户确认
 - 保持现有代码风格（缩进、命名、引号风格）
-- 修改后代码必须可立即运行
-
-### Python 项目
-- 添加所有必要的 import
-- 整数字段使用 `int`，不混用 `float`
-- 注意编码声明 `# -*- coding: utf-8 -*-`
-
-### Web 前端项目
-- 保持现代、美观的 UI 风格
-- CSS/JS 内联优先，尽量避免新增文件
-
-### 数值/配置变更
-- 先查 `constants.py`（或项目等效配置文件）
-- 不在业务代码中硬编码数值
+- 不添加与任务无关的 import、注释、emoji
+- 不在业务代码中硬编码数值（先查 `constants.py` 或等价配置文件）
+- 不引入新外部依赖，除非用户明确要求
 
 ---
 
-## 4. 回复规范
+## 5. 回复规则
 
-- 回答精炼，直奔主题，不展开无关背景知识
-- 修改完成后用简洁列表说明改动内容
-- 如果任务触发多个文件修改，完成后列出文件清单
-- 有错误时先自行修复，修复不了再向用户说明
-
----
-
-## 5. 禁止事项清单
-
-| 禁止行为 | 说明 |
-|---------|------|
-| 跳过 CODE_INDEX.md 直接扫描项目 | 最严重违规 |
-| 对 1000+ 行文件做全文重写 | 应使用 replace_in_file 分批改 |
-| 连续 replace 同一文件超过3次不重新 read | 文件可能已被用户并行修改 |
-| 添加与任务无关的代码/注释/emoji | 保持diff干净 |
-| 生成无法直接运行的代码 | 缺少 import、依赖等 |
-| 删除 `.codebuddy` 目录 | 项目数据目录，非临时缓存 |
+- 修改完成后用简洁列表说明：改了什么文件、什么函数、为什么
+- 有错误先自行修复，修复不了再告知用户
+- 不提"我先读一下 CODE_INDEX.md"——直接做，做完汇报结果
 
 ---
 
 ## 移植指南
 
-> 📋 **如何将此协议移植到新项目**
-
 ```
-# 1. 复制本文件到新项目根目录（按目标平台命名）
-cp AGENTS.md /path/to/new-project/       # Codex / Qwen Code / Augment
-cp AGENTS.md /path/to/new-project/CLAUDE.md  # Claude Code
-cp AGENTS.md /path/to/new-project/CODEBUDDY.md  # CodeBuddy
-cp AGENTS.md /path/to/new-project/GEMINI.md  # Gemini CLI
+# 按目标平台命名复制
+cp AGENTS.md /target/project/AGENTS.md       # Codex / Qwen / Augment
+cp AGENTS.md /target/project/CLAUDE.md       # Claude Code
+cp AGENTS.md /target/project/CODEBUDDY.md    # CodeBuddy
+cp AGENTS.md /target/project/GEMINI.md       # Gemini CLI
 
-# 2. 为该项目创建专属索引
-#    参见 CODE_INDEX.md 的模板结构
-
-# 3. 部署 IDE 规则包装层（可选）
-#    .cursor/rules/project.mdc     → Cursor
-#    .windsurfrules                → Windsurf
-#    .github/copilot-instructions.md → GitHub Copilot
-#    .codebuddy/rules/project-readme.md → CodeBuddy IDE
+# IDE 适配器（可选）
+# .cursor/rules/project.mdc           → Cursor
+# .windsurfrules                      → Windsurf
+# .github/copilot-instructions.md     → GitHub Copilot
+# .codebuddy/rules/project-readme.md  → CodeBuddy IDE
 ```
-
-**AGENTS.md 是引擎，CODE_INDEX.md 是燃料。换项目只换燃料，引擎不变。**
